@@ -1,0 +1,24 @@
+#!/bin/bash
+# omarchy-macstyle: check that the Mac-style setup survived `omarchy update`.
+# Check-only: fixing keyd needs sudo, and a refreshed bindings.lua is the
+# user's file to edit.
+
+set -u
+
+warn() { echo "omarchy-macstyle: WARN: $*" >&2; }
+
+if command -v hyprctl >/dev/null && hyprctl binds -j >/dev/null 2>&1; then
+  hyprctl binds -j | grep -q '"description": *"IME on (Japanese)"' ||
+    warn 'Mac-style binds are not loaded — is require("hypr.macstyle") still in ~/.config/hypr/bindings.lua?'
+fi
+
+conf=/etc/keyd/default.conf
+if [[ ! -f $conf ]] || ! grep -q 'overload(meta, f13)' "$conf" || ! grep -q 'overload(meta, f14)' "$conf"; then
+  warn "$conf lost the Cmd-tap mapping — run install.sh --keyd"
+fi
+systemctl is-active --quiet keyd || warn "keyd.service is not active — sudo systemctl enable --now keyd"
+
+fcitx_conf="${XDG_CONFIG_HOME:-$HOME/.config}/fcitx5/config"
+if [[ -f $fcitx_conf ]] && grep -A3 '^\[Hotkey/TriggerKeys\]' "$fcitx_conf" | grep -qi 'Control+space'; then
+  warn "fcitx5 TriggerKeys has Control+space — it steals Ctrl+Space before Hyprland and tmux"
+fi
